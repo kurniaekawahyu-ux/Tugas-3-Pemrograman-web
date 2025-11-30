@@ -1,0 +1,14 @@
+<div v-if="show" class="modal-overlay" @click.self="close">
+    <div class="modal-content" :class="'modal-' + size">
+        <div class="modal-header">
+            <h3>{{ title }}</h3>
+            <button @click="close" class="btn btn-sm btn-secondary">&times;</button>
+        </div>
+        <div class="modal-body">
+            <slot></slot>
+        </div>
+        <div class="modal-footer" v-if="$slots.footer">
+            <slot name="footer"></slot>
+        </div>
+    </div>
+</div>

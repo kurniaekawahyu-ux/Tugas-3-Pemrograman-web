@@ -1,0 +1,174 @@
+<div class="order-management">
+    <div class="page-header">
+        <h2>Form Pemesanan Bahan Ajar</h2>
+    </div>
+
+    <div class="order-layout">
+        <!-- Daftar Bahan Ajar -->
+        <div class="product-list">
+            <h3>Daftar Bahan Ajar Tersedia</h3>
+            <div class="product-grid">
+                <div v-for="item in bahanAjar" :key="item.kode" class="product-card">
+                    <div class="product-info">
+                        <h4>{{ item.judul }}</h4>
+                        <p class="product-code">{{ item.kode }}</p>
+                        <p class="product-category">{{ item.kategori }} - {{ item.upbjj }}</p>
+                        <p class="product-price">{{ formatCurrency(item.harga) }}</p>
+                        <p class="product-stock">
+                            Stok: {{ item.qty }} buah 
+                            <status-badge 
+                                :qty="item.qty" 
+                                :safety="item.safety"
+                                :catatan-html="item.catatanHTML"
+                            ></status-badge>
+                        </p>
+                    </div>
+                    <button 
+                        @click="addToCart(item)" 
+                        class="btn btn-primary"
+                        :disabled="item.qty === 0"
+                    >
+                        {{ item.qty === 0 ? 'Stok Habis' : 'Tambah ke Keranjang' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Keranjang Belanja -->
+        <div class="cart-section">
+            <h3>Keranjang Belanja</h3>
+            <div class="cart-items">
+                <div v-if="cart.length === 0" class="empty-cart">
+                    Keranjang belanja kosong
+                </div>
+                <div v-for="(item, index) in cart" :key="item.kode" class="cart-item">
+                    <div class="cart-item-info">
+                        <h5>{{ item.judul }}</h5>
+                        <p class="cart-item-code">{{ item.kode }}</p>
+                        <p class="cart-item-price">{{ formatCurrency(item.harga) }}</p>
+                    </div>
+                    <div class="cart-item-controls">
+                        <div class="quantity-controls">
+                            <button 
+                                @click="updateQuantity(item, item.qty - 1)" 
+                                class="btn btn-sm btn-secondary"
+                            >-</button>
+                            <span class="quantity">{{ item.qty }}</span>
+                            <button 
+                                @click="updateQuantity(item, item.qty + 1)" 
+                                class="btn btn-sm btn-secondary"
+                                :disabled="item.qty >= item.stock"
+                            >+</button>
+                        </div>
+                        <p class="cart-item-total">
+                            Total: {{ formatCurrency(item.harga * item.qty) }}
+                        </p>
+                        <button 
+                            @click="removeFromCart(index)" 
+                            class="btn btn-sm btn-danger"
+                        >Hapus</button>
+                    </div>
+                </div>
+            </div>
+
+            <div v-if="cart.length > 0" class="cart-summary">
+                <div class="total-section">
+                    <h4>Total: {{ formattedTotal }}</h4>
+                </div>
+                <button @click="clearCart" class="btn btn-secondary">Kosongkan Keranjang</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Form Data Pemesan -->
+    <div v-if="cart.length > 0" class="customer-form-section">
+        <h3>Data Pemesan</h3>
+        <form @submit.prevent="submitOrder" class="customer-form">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>NIM *</label>
+                    <input 
+                        type="text" 
+                        v-model="orderForm.nim" 
+                        class="form-control" 
+                        required
+                        placeholder="Masukkan NIM"
+                    >
+                </div>
+                <div class="form-group">
+                    <label>Nama Lengkap *</label>
+                    <input 
+                        type="text" 
+                        v-model="orderForm.nama" 
+                        class="form-control" 
+                        required
+                        placeholder="Masukkan nama lengkap"
+                    >
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>UT-Daerah *</label>
+                    <select v-model="orderForm.upbjj" class="form-control" required>
+                        <option value="">Pilih UT-Daerah</option>
+                        <option v-for="upbjj in ['Jakarta', 'Surabaya', 'Makassar', 'Padang', 'Denpasar']" 
+                                :key="upbjj" 
+                                :value="upbjj">
+                            {{ upbjj }}
+                        </option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Nomor Telepon</label>
+                    <input 
+                        type="tel" 
+                        v-model="orderForm.telepon" 
+                        class="form-control"
+                        placeholder="Masukkan nomor telepon"
+                    >
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Alamat Pengiriman</label>
+                <textarea 
+                    v-model="orderForm.alamat" 
+                    class="form-control"
+                    rows="3"
+                    placeholder="Masukkan alamat lengkap untuk pengiriman"
+                ></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary btn-lg">Buat Pesanan</button>
+        </form>
+    </div>
+
+    <!-- Modal Konfirmasi Pesanan -->
+    <app-modal 
+        :show="showOrderModal" 
+        title="Konfirmasi Pesanan"
+        @close="showOrderModal = false"
+    >
+        <div class="order-confirmation">
+            <h4>Pesanan Berhasil Dibuat!</h4>
+            <div class="order-details">
+                <p><strong>NIM:</strong> {{ orderForm.nim }}</p>
+                <p><strong>Nama:</strong> {{ orderForm.nama }}</p>
+                <p><strong>UT-Daerah:</strong> {{ orderForm.upbjj }}</p>
+                <p><strong>Total Pesanan:</strong> {{ formattedTotal }}</p>
+            </div>
+            <div class="order-items">
+                <h5>Items yang dipesan:</h5>
+                <ul>
+                    <li v-for="item in cart" :key="item.kode">
+                        {{ item.judul }} ({{ item.qty }} x {{ formatCurrency(item.harga) }})
+                    </li>
+                </ul>
+            </div>
+            <p class="confirmation-message">
+                Pesanan Anda sedang diproses. Silakan cek halaman Tracking DO untuk memantau status pengiriman.
+            </p>
+        </div>
+        <template #footer>
+            <button @click="finishOrder" class="btn btn-primary">Selesai</button>
+        </template>
+    </app-modal>
+</div>

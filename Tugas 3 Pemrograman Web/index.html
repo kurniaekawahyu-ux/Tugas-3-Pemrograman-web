@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SITTA - Sistem Informasi Bahan Ajar UT</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <div class="logo-container">
+                    <div class="logo-placeholder">📚</div>
+                    <h1>SITTA - Sistem Informasi Bahan Ajar UT</h1>
+                </div>
+                <nav class="main-nav">
+                    <ul>
+                        <li :class="{ active: currentTab === 'dashboard' }">
+                            <a href="#" @click.prevent="currentTab = 'dashboard'">Dashboard</a>
+                        </li>
+                        <li :class="{ active: currentTab === 'stok' }">
+                            <a href="#" @click.prevent="currentTab = 'stok'">Stok Bahan Ajar</a>
+                        </li>
+                        <li :class="{ active: currentTab === 'tracking' }">
+                            <a href="#" @click.prevent="currentTab = 'tracking'">Tracking DO</a>
+                        </li>
+                        <li :class="{ active: currentTab === 'order' }">
+                            <a href="#" @click.prevent="currentTab = 'order'">Pemesanan</a>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Dashboard -->
+            <div v-if="currentTab === 'dashboard'" class="dashboard">
+                <div class="welcome-section">
+                    <h2>Selamat Datang di Aplikasi SITTA</h2>
+                    <p>Sistem Informasi Bahan Ajar Universitas Terbuka</p>
+                </div>
+                <div class="stats-section">
+                    <div class="stat-card">
+                        <h3>Total Bahan Ajar</h3>
+                        <p class="stat-number">{{ totalBahanAjar }}</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Stok Menipis</h3>
+                        <p class="stat-number">{{ stokMenipis }}</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>DO Aktif</h3>
+                        <p class="stat-number">{{ doAktif }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stok Bahan Ajar - DIUBAH: Hapus duplikasi tabel -->
+            <div v-if="currentTab === 'stok'" class="tab-content">
+                <div class="page-header">
+                    <h2>📦 Manajemen Stok Bahan Ajar</h2>
+                    <button class="btn btn-primary" @click="showStokForm = true">
+                        + Tambah Bahan Ajar
+                    </button>
+                </div>
+                
+                <!-- Filter Section -->
+                <div class="filters-section">
+                    <h3>🔍 Filter dan Sortir</h3>
+                    <div class="filter-row">
+                        <div class="form-group">
+                            <label>UT-Daerah</label>
+                            <select v-model="filters.upbjj" class="form-control">
+                                <option value="">Semua Daerah</option>
+                                <option v-for="upbjj in upbjjList" :value="upbjj">{{ upbjj }}</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Kategori</label>
+                            <select v-model="filters.kategori" class="form-control">
+                                <option value="">Semua Kategori</option>
+                                <option v-for="kategori in kategoriList" :value="kategori">{{ kategori }}</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" v-model="filters.stokRendah"> Stok Menipis
+                            </label>
+                            <br>
+                            <label>
+                                <input type="checkbox" v-model="filters.stokKosong"> Stok Kosong
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <button class="btn btn-secondary" @click="resetFilters">
+                                🔄 Reset Filter
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Tabel Stok - HANYA SATU TABEL -->
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th @click="sortData('kode')" class="sortable">Kode 📊</th>
+                                <th @click="sortData('judul')" class="sortable">Judul 📊</th>
+                                <th>Kategori</th>
+                                <th>UT-Daerah</th>
+                                <th>Lokasi Rak</th>
+                                <th @click="sortData('harga')" class="sortable">Harga 📊</th>
+                                <th @click="sortData('qty')" class="sortable">Stok 📊</th>
+                                <th>Safety Stock</th>
+                                <th>Status</th>
+                                <th>Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="item in sortedAndFilteredBahanAjar" :key="item.kode">
+                                <td><strong>{{ item.kode }}</strong></td>
+                                <td>{{ item.judul }}</td>
+                                <td>{{ item.kategori }}</td>
+                                <td>{{ item.upbjj }}</td>
+                                <td>{{ item.lokasiRak }}</td>
+                                <td>Rp {{ formatNumber(item.harga) }}</td>
+                                <td>{{ item.qty }} buah</td>
+                                <td>{{ item.safety }} buah</td>
+                                <td>
+                                    <span class="badge" :class="getStatusClass(item)" :title="item.catatanHTML">
+                                        {{ getStatusText(item) }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-primary" @click="editStok(item)">
+                                        ✏️ Edit
+                                    </button>
+                                    <button class="btn btn-sm btn-danger" @click="deleteStok(item)">
+                                        🗑️ Hapus
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr v-if="sortedAndFilteredBahanAjar.length === 0">
+                                <td colspan="10" class="empty-state">
+                                    📭 Tidak ada data stok dengan filter yang dipilih
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Tracking DO - DIUBAH: Perbaiki struktur -->
+            <div v-if="currentTab === 'tracking'" class="tab-content">
+                <div class="page-header">
+                    <h2>🚚 Tracking Delivery Order</h2>
+                    <button class="btn btn-primary" @click="showTrackingForm = true">
+                        + Tambah DO Baru
+                    </button>
+                </div>
+                
+                <!-- Search Section -->
+                <div class="filters-section">
+                    <h3>🔍 Cari DO</h3>
+                    <div class="filter-row">
+                        <div class="form-group">
+                            <input type="text" v-model="searchQuery" class="form-control" 
+                                   placeholder="Cari berdasarkan No. DO, NIM, atau Nama..."
+                                   @keyup.enter="searchDO"
+                                   @keyup.esc="clearSearch">
+                        </div>
+                        <div class="form-group">
+                            <button class="btn btn-primary" @click="searchDO">Cari</button>
+                            <button class="btn btn-secondary" @click="clearSearch">Reset</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Tabel Tracking - DIUBAH: Gunakan data deliveryOrders -->
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>No. DO</th>
+                                <th>NIM</th>
+                                <th>Nama</th>
+                                <th>Ekspedisi</th>
+                                <th>Paket</th>
+                                <th>Tanggal Kirim</th>
+                                <th>Total</th>
+                                <th>Status</th>
+                                <th>Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="doItem in filteredDeliveryOrders" :key="doItem.noDO">
+                                <td><strong>{{ doItem.noDO }}</strong></td>
+                                <td>{{ doItem.nim }}</td>
+                                <td>{{ doItem.nama }}</td>
+                                <td>{{ doItem.ekspedisi }}</td>
+                                <td>{{ doItem.paket }}</td>
+                                <td>{{ formatDate(doItem.tanggalKirim) }}</td>
+                                <td>Rp {{ formatNumber(doItem.totalHarga) }}</td>
+                                <td>
+                                    <span class="status" :class="'status-' + doItem.status.toLowerCase().replace(' ', '-')">
+                                        {{ doItem.status }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-primary" @click="viewDODetails(doItem)">
+                                        👁️ Detail
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr v-if="filteredDeliveryOrders.length === 0">
+                                <td colspan="9" class="empty-state">
+                                    📭 Tidak ada data DO yang ditemukan
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Form Pemesanan - DIUBAH: Perbaiki struktur -->
+            <div v-if="currentTab === 'order'" class="tab-content">
+                <div class="page-header">
+                    <h2>🛒 Form Pemesanan Bahan Ajar</h2>
+                </div>
+                
+                <div class="order-simple">
+                    <div class="form-group">
+                        <label>NIM:</label>
+                        <input type="text" v-model="orderForm.nim" class="form-control" placeholder="Masukkan NIM">
+                    </div>
+                    <div class="form-group">
+                        <label>Nama:</label>
+                        <input type="text" v-model="orderForm.nama" class="form-control" placeholder="Masukkan nama">
+                    </div>
+                    <div class="form-group">
+                        <label>Mata Kuliah:</label>
+                        <select v-model="orderForm.mataKuliah" class="form-control" required>
+                            <option value="">Pilih Mata Kuliah</option>
+                            <option value="BIOL4201">BIOL4201 - Biologi Umum (Praktikum)</option>
+                            <option value="FISIP4001">FISIP4001 - Dasar-Dasar Sosiologi</option>
+                            <option value="MATH4101">MATH4101 - Matematika Dasar</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Ekspedisi:</label>
+                        <select v-model="orderForm.ekspedisi" class="form-control" required>
+                            <option value="">Pilih Ekspedisi</option>
+                            <option value="JNE">JNE</option>
+                            <option value="TIKI">TIKI</option>
+                            <option value="POS Indonesia">POS Indonesia</option>
+                            <option value="J&T">J&T</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-primary" @click="submitOrder">Pesan Sekarang</button>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="app-footer">
+            <p>&copy; 2025 Universitas Terbuka - SITTA</p>
+        </footer>
+
+        <!-- Modal Form Stok -->
+        <div class="modal" :class="{ show: showStokForm }">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>{{ editingStok ? '✏️ Edit Bahan Ajar' : '➕ Tambah Bahan Ajar' }}</h3>
+                    <button class="modal-close" @click="closeStokForm">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form @submit.prevent="saveStok">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Kode Mata Kuliah *</label>
+                                <input type="text" v-model="stokForm.kode" class="form-control" required 
+                                       :readonly="editingStok" placeholder="EKMA4116">
+                            </div>
+                            <div class="form-group">
+                                <label>Judul Mata Kuliah *</label>
+                                <input type="text" v-model="stokForm.judul" class="form-control" required 
+                                       placeholder="Pengantar Manajemen">
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Kategori *</label>
+                                <select v-model="stokForm.kategori" class="form-control" required>
+                                    <option value="">Pilih Kategori</option>
+                                    <option v-for="kategori in kategoriList" :value="kategori">{{ kategori }}</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>UT-Daerah *</label>
+                                <select v-model="stokForm.upbjj" class="form-control" required>
+                                    <option value="">Pilih UT-Daerah</option>
+                                    <option v-for="upbjj in upbjjList" :value="upbjj">{{ upbjj }}</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Lokasi Rak</label>
+                                <input type="text" v-model="stokForm.lokasiRak" class="form-control" 
+                                       placeholder="R1-A3">
+                            </div>
+                            <div class="form-group">
+                                <label>Harga *</label>
+                                <input type="number" v-model="stokForm.harga" class="form-control" required 
+                                       min="0" placeholder="65000">
+                            </div>
+                            <div class="form-group">
+                                <label>Safety Stock *</label>
+                                <input type="number" v-model="stokForm.safety" class="form-control" required 
+                                       min="0" placeholder="20">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Jumlah Stok *</label>
+                            <input type="number" v-model="stokForm.qty" class="form-control" required 
+                                   min="0" placeholder="28">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Catatan</label>
+                            <textarea v-model="stokForm.catatanHTML" class="form-control" rows="3"
+                                      placeholder="Catatan tambahan..."></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @click="closeStokForm">Batal</button>
+                    <button class="btn btn-primary" @click="saveStok">
+                        💾 {{ editingStok ? 'Update' : 'Simpan' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Form Tracking DO -->
+        <div class="modal" :class="{ show: showTrackingForm }">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>➕ Tambah DO Baru</h3>
+                    <button class="modal-close" @click="closeTrackingForm">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form @submit.prevent="saveDO">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>NIM *</label>
+                                <input type="text" v-model="doForm.nim" class="form-control" required 
+                                       placeholder="123456789">
+                            </div>
+                            <div class="form-group">
+                                <label>Nama *</label>
+                                <input type="text" v-model="doForm.nama" class="form-control" required 
+                                       placeholder="Nama Mahasiswa">
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Paket Bahan Ajar *</label>
+                                <select v-model="doForm.paket" class="form-control" required>
+                                    <option value="">Pilih Paket</option>
+                                    <option value="PAKET-UT-001">PAKET IPS Dasar</option>
+                                    <option value="PAKET-UT-002">PAKET IPA Dasar</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Ekspedisi *</label>
+                                <select v-model="doForm.ekspedisi" class="form-control" required>
+                                    <option value="">Pilih Ekspedisi</option>
+                                    <option value="JNE">JNE</option>
+                                    <option value="TIKI">TIKI</option>
+                                    <option value="POS Indonesia">POS Indonesia</option>
+                                    <option value="J&T">J&T</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Tanggal Kirim *</label>
+                            <input type="date" v-model="doForm.tanggalKirim" class="form-control" required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @click="closeTrackingForm">Batal</button>
+                    <button class="btn btn-primary" @click="saveDO">💾 Simpan DO</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        new Vue({
+            el: '#app',
+            data: {
+                currentTab: 'dashboard',
+                totalBahanAjar: 5,
+                stokMenipis: 2,
+                doAktif: 2,
+                
+                // Stok Management
+                showStokForm: false,
+                editingStok: null,
+                stokForm: {
+                    kode: '',
+                    judul: '',
+                    kategori: '',
+                    upbjj: '',
+                    lokasiRak: '',
+                    harga: '',
+                    qty: '',
+                    safety: '',
+                    catatanHTML: ''
+                },
+                filters: {
+                    upbjj: '',
+                    kategori: '',
+                    stokRendah: false,
+                    stokKosong: false
+                },
+                sortBy: 'judul',
+                sortDirection: 'asc',
+                
+                // Data Lists
+                upbjjList: ["Jakarta", "Surabaya", "Makassar", "Padang", "Denpasar"],
+                kategoriList: ["MK Wajib", "MK Pilihan", "Praktikum", "Problem-Based"],
+                
+                // Sample Data Stok
+                bahanAjar: [
+                    {
+                        kode: "EKMA4116",
+                        judul: "Pengantar Manajemen",
+                        kategori: "MK Wajib",
+                        upbjj: "Jakarta",
+                        lokasiRak: "R1-A3",
+                        harga: 65000,
+                        qty: 28,
+                        safety: 20,
+                        catatanHTML: "Edisi 2024, cetak ulang"
+                    },
+                    {
+                        kode: "EKMA4115",
+                        judul: "Pengantar Akuntansi", 
+                        kategori: "MK Wajib",
+                        upbjj: "Jakarta",
+                        lokasiRak: "R1-A4",
+                        harga: 60000,
+                        qty: 7,
+                        safety: 15,
+                        catatanHTML: "Cover baru"
+                    },
+                    {
+                        kode: "BIOL4201",
+                        judul: "Biologi Umum (Praktikum)",
+                        kategori: "Praktikum", 
+                        upbjj: "Surabaya",
+                        lokasiRak: "R3-B2",
+                        harga: 80000,
+                        qty: 12,
+                        safety: 10,
+                        catatanHTML: "Butuh pendingin untuk kit basah"
+                    },
+                    {
+                        kode: "FISIP4001",
+                        judul: "Dasar-Dasar Sosiologi",
+                        kategori: "MK Pilihan",
+                        upbjj: "Makassar", 
+                        lokasiRak: "R2-C1",
+                        harga: 55000,
+                        qty: 2,
+                        safety: 8,
+                        catatanHTML: "Stok menipis, prioritaskan reorder"
+                    },
+                    {
+                        kode: "MATH4101",
+                        judul: "Matematika Dasar",
+                        kategori: "MK Wajib",
+                        upbjj: "Denpasar",
+                        lokasiRak: "R1-B1", 
+                        harga: 70000,
+                        qty: 0,
+                        safety: 10,
+                        catatanHTML: "Stok habis, cetak ulang sedang proses"
+                    }
+                ],
+                
+                // Tracking DO
+                showTrackingForm: false,
+                searchQuery: '',
+                doForm: {
+                    nim: '',
+                    nama: '',
+                    paket: '',
+                    ekspedisi: '',
+                    tanggalKirim: new Date().toISOString().split('T')[0]
+                },
+                deliveryOrders: [
+                    {
+                        noDO: "DO2025-001",
+                        nim: "123456789",
+                        nama: "Rina Wulandari",
+                        ekspedisi: "JNE",
+                        paket: "PAKET-UT-001",
+                        tanggalKirim: "2025-08-25",
+                        totalHarga: 120000,
+                        status: "Dalam Perjalanan"
+                    },
+                    {
+                        noDO: "DO2025-002",
+                        nim: "987654321", 
+                        nama: "Budi Santoso",
+                        ekspedisi: "TIKI",
+                        paket: "PAKET-UT-002",
+                        tanggalKirim: "2025-08-24",
+                        totalHarga: 140000,
+                        status: "Selesai"
+                    }
+                ],
+                
+                // Order Form
+                orderForm: {
+                    nim: '',
+                    nama: '',
+                    mataKuliah: '',
+                    ekspedisi: ''
+                }
+            },
+            
+            computed: {
+                sortedAndFilteredBahanAjar() {
+                    let result = this.bahanAjar.filter(item => {
+                        // Filter UT-Daerah
+                        if (this.filters.upbjj && item.upbjj !== this.filters.upbjj) {
+                            return false;
+                        }
+                        
+                        // Filter Kategori
+                        if (this.filters.kategori && item.kategori !== this.filters.kategori) {
+                            return false;
+                        }
+                        
+                        // Filter Stok Rendah
+                        if (this.filters.stokRendah && item.qty >= item.safety) {
+                            return false;
+                        }
+                        
+                        // Filter Stok Kosong
+                        if (this.filters.stokKosong && item.qty > 0) {
+                            return false;
+                        }
+                        
+                        return true;
+                    });
+                    
+                    // Sorting
+                    result.sort((a, b) => {
+                        let aVal = a[this.sortBy];
+                        let bVal = b[this.sortBy];
+                        
+                        if (typeof aVal === 'string') {
+                            aVal = aVal.toLowerCase();
+                            bVal = bVal.toLowerCase();
+                        }
+                        
+                        if (aVal < bVal) return this.sortDirection === 'asc' ? -1 : 1;
+                        if (aVal > bVal) return this.sortDirection === 'asc' ? 1 : -1;
+                        return 0;
+                    });
+                    
+                    return result;
+                },
+                
+                filteredDeliveryOrders() {
+                    if (!this.searchQuery.trim()) {
+                        return this.deliveryOrders;
+                    }
+                    
+                    const query = this.searchQuery.toLowerCase();
+                    return this.deliveryOrders.filter(doItem => 
+                        doItem.noDO.toLowerCase().includes(query) ||
+                        doItem.nim.toLowerCase().includes(query) ||
+                        doItem.nama.toLowerCase().includes(query)
+                    );
+                },
+                
+                nextDONumber() {
+                    if (this.deliveryOrders.length === 0) return 'DO2025-001';
+                    
+                    const lastDO = this.deliveryOrders[this.deliveryOrders.length - 1];
+                    const match = lastDO.noDO.match(/DO(\d+)-(\d+)/);
+                    if (match) {
+                        const year = match[1];
+                        const sequence = parseInt(match[2]) + 1;
+                        return `DO${year}-${sequence.toString().padStart(3, '0')}`;
+                    }
+                    return 'DO2025-001';
+                }
+            },
+            
+            methods: {
+                formatNumber(value) {
+                    return new Intl.NumberFormat('id-ID').format(value);
+                },
+                
+                formatDate(dateString) {
+                    if (!dateString) return '';
+                    const date = new Date(dateString);
+                    return date.toLocaleDateString('id-ID', {
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric'
+                    });
+                },
+                
+                getStatusClass(item) {
+                    if (item.qty === 0) return 'badge-danger';
+                    if (item.qty < item.safety) return 'badge-warning';
+                    return 'badge-success';
+                },
+                
+                getStatusText(item) {
+                    if (item.qty === 0) return 'Kosong';
+                    if (item.qty < item.safety) return 'Menipis';
+                    return 'Aman';
+                },
+                
+                // Stok Management Methods
+                sortData(field) {
+                    if (this.sortBy === field) {
+                        this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        this.sortBy = field;
+                        this.sortDirection = 'asc';
+                    }
+                },
+                
+                resetFilters() {
+                    this.filters = {
+                        upbjj: '',
+                        kategori: '',
+                        stokRendah: false,
+                        stokKosong: false
+                    };
+                },
+                
+                editStok(item) {
+                    this.editingStok = item;
+                    this.stokForm = { ...item };
+                    this.showStokForm = true;
+                },
+                
+                deleteStok(item) {
+                    if (confirm(`Hapus bahan ajar "${item.judul}"?`)) {
+                        const index = this.bahanAjar.findIndex(i => i.kode === item.kode);
+                        if (index !== -1) {
+                            this.bahanAjar.splice(index, 1);
+                            this.updateStats();
+                        }
+                    }
+                },
+                
+                closeStokForm() {
+                    this.showStokForm = false;
+                    this.editingStok = null;
+                    this.stokForm = {
+                        kode: '', judul: '', kategori: '', upbjj: '', lokasiRak: '',
+                        harga: '', qty: '', safety: '', catatanHTML: ''
+                    };
+                },
+                
+                saveStok() {
+                    // Validasi
+                    if (!this.stokForm.kode || !this.stokForm.judul || !this.stokForm.kategori || 
+                        !this.stokForm.upbjj || !this.stokForm.harga || !this.stokForm.qty || !this.stokForm.safety) {
+                        alert('Harap isi semua field yang wajib!');
+                        return;
+                    }
+                    
+                    if (this.editingStok) {
+                        // Update existing
+                        const index = this.bahanAjar.findIndex(i => i.kode === this.editingStok.kode);
+                        if (index !== -1) {
+                            this.bahanAjar.splice(index, 1, { ...this.stokForm });
+                        }
+                    } else {
+                        // Add new - Periksa duplikasi kode
+                        const existing = this.bahanAjar.find(item => item.kode === this.stokForm.kode);
+                        if (existing) {
+                            alert('Kode mata kuliah sudah ada!');
+                            return;
+                        }
+                        this.bahanAjar.push({ ...this.stokForm });
+                    }
+                    this.updateStats();
+                    this.closeStokForm();
+                    alert('Data stok berhasil disimpan!');
+                },
+                
+                updateStats() {
+                    this.totalBahanAjar = this.bahanAjar.length;
+                    this.stokMenipis = this.bahanAjar.filter(item => 
+                        item.qty > 0 && item.qty < item.safety
+                    ).length;
+                    this.doAktif = this.deliveryOrders.filter(doItem => 
+                        doItem.status !== 'Selesai'
+                    ).length;
+                },
+                
+                // Tracking DO Methods
+                searchDO() {
+                    // Computed property filteredDeliveryOrders sudah menangani pencarian
+                },
+                
+                clearSearch() {
+                    this.searchQuery = '';
+                },
+                
+                closeTrackingForm() {
+                    this.showTrackingForm = false;
+                    this.doForm = {
+                        nim: '',
+                        nama: '',
+                        paket: '',
+                        ekspedisi: '',
+                        tanggalKirim: new Date().toISOString().split('T')[0]
+                    };
+                },
+                
+                saveDO() {
+                    // Validasi
+                    if (!this.doForm.nim || !this.doForm.nama || !this.doForm.paket || 
+                        !this.doForm.ekspedisi || !this.doForm.tanggalKirim) {
+                        alert('Harap isi semua field yang wajib!');
+                        return;
+                    }
+                    
+                    const newDO = {
+                        noDO: this.nextDONumber,
+                        nim: this.doForm.nim,
+                        nama: this.doForm.nama,
+                        ekspedisi: this.doForm.ekspedisi,
+                        paket: this.doForm.paket,
+                        tanggalKirim: this.doForm.tanggalKirim,
+                        totalHarga: this.doForm.paket === 'PAKET-UT-001' ? 120000 : 140000,
+                        status: 'Dalam Proses'
+                    };
+                    
+                    this.deliveryOrders.push(newDO);
+                    this.closeTrackingForm();
+                    this.updateStats();
+                    alert('DO berhasil ditambahkan!');
+                },
+                
+                viewDODetails(doItem) {
+                    alert(`Detail DO:\nNo: ${doItem.noDO}\nNIM: ${doItem.nim}\nNama: ${doItem.nama}\nStatus: ${doItem.status}`);
+                },
+                
+                // Order Methods
+                submitOrder() {
+                    if (this.orderForm.nim && this.orderForm.nama && this.orderForm.mataKuliah && this.orderForm.ekspedisi) {
+                        alert(`Pesanan berhasil!\nNIM: ${this.orderForm.nim}\nNama: ${this.orderForm.nama}\nMata Kuliah: ${this.orderForm.mataKuliah}\nEkspedisi: ${this.orderForm.ekspedisi}`);
+                        this.orderForm = { nim: '', nama: '', mataKuliah: '', ekspedisi: '' };
+                    } else {
+                        alert('Harap isi semua field!');
+                    }
+                }
+            },
+            
+            created() {
+                this.updateStats();
+            }
+        });  
+    </script>
+</body>
+</html>

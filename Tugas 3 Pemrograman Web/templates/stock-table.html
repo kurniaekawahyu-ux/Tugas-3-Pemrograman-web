@@ -1,0 +1,201 @@
+<div class="stock-management">
+    <div class="page-header">
+        <h2>Manajemen Stok Bahan Ajar</h2>
+        <button @click="openAddForm" class="btn btn-primary">Tambah Bahan Ajar</button>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters-section">
+        <h3>Filter dan Sortir</h3>
+        <div class="filter-row">
+            <div class="form-group">
+                <label>UT-Daerah</label>
+                <select v-model="filters.upbjj" class="form-control">
+                    <option value="">Semua Daerah</option>
+                    <option v-for="upbjj in upbjjList" :key="upbjj" :value="upbjj">{{ upbjj }}</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Kategori Mata Kuliah</label>
+                <select v-model="filters.kategori" class="form-control" :disabled="!filters.upbjj">
+                    <option value="">Semua Kategori</option>
+                    <option v-for="kategori in kategoriList" :key="kategori" :value="kategori">{{ kategori }}</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" v-model="filters.stokRendah"> Stok Menipis (qty < 10)
+                </label>
+                <br>
+                <label>
+                    <input type="checkbox" v-model="filters.stokKosong"> Stok Kosong (qty = 0)
+                </label>
+            </div>
+            <div class="form-group">
+                <label>Urutkan Berdasarkan:</label>
+                <select v-model="sortBy" @change="sortData(sortBy)" class="form-control">
+                    <option value="judul">Judul</option>
+                    <option value="qty">Jumlah Stok</option>
+                    <option value="harga">Harga</option>
+                </select>
+                <button @click="sortDirection = sortDirection === 'asc' ? 'desc' : 'asc'" class="btn btn-sm btn-secondary">
+                    {{ sortDirection === 'asc' ? '↑' : '↓' }}
+                </button>
+            </div>
+            <div class="form-group">
+                <button @click="resetFilters" class="btn btn-secondary">Reset Filter</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabel Stok -->
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Kode/Judul</th>
+                    <th>Kategori</th>
+                    <th>UT-Daerah</th>
+                    <th>Lokasi Rak</th>
+                    <th>Harga</th>
+                    <th>Stok</th>
+                    <th>Safety Stock</th>
+                    <th>Status</th>
+                    <th>Aksi</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr v-for="item in sortedAndFilteredBahanAjar" :key="item.kode">
+                    <td>
+                        <strong>{{ item.kode }}</strong><br>
+                        {{ item.judul }}
+                    </td>
+                    <td>{{ item.kategori }}</td>
+                    <td>{{ item.upbjj }}</td>
+                    <td>{{ item.lokasiRak }}</td>
+                    <td>{{ formatCurrency(item.harga) }}</td>
+                    <td>{{ formatQuantity(item.qty) }}</td>
+                    <td>{{ formatQuantity(item.safety) }}</td>
+                    <td>
+                        <status-badge 
+                            :qty="item.qty" 
+                            :safety="item.safety"
+                            :catatan-html="item.catatanHTML"
+                        ></status-badge>
+                    </td>
+                    <td>
+                        <button @click="openEditForm(item)" class="btn btn-sm btn-primary">Edit</button>
+                        <button @click="confirmDelete(item)" class="btn btn-sm btn-danger">Hapus</button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Modal Form -->
+    <app-modal 
+        :show="showForm" 
+        :title="editingItem ? 'Edit Bahan Ajar' : 'Tambah Bahan Ajar'"
+        @close="showForm = false"
+    >
+        <form @submit.prevent="saveItem" @keydown="handleKeydown">
+            <div class="form-group">
+                <label>Kode Mata Kuliah *</label>
+                <input 
+                    type="text" 
+                    v-model="formData.kode" 
+                    class="form-control" 
+                    required
+                    :readonly="editingItem"
+                >
+            </div>
+            <div class="form-group">
+                <label>Judul Mata Kuliah *</label>
+                <input 
+                    type="text" 
+                    v-model="formData.judul" 
+                    class="form-control" 
+                    required
+                >
+            </div>
+            <div class="form-group">
+                <label>Kategori *</label>
+                <select v-model="formData.kategori" class="form-control" required>
+                    <option value="">Pilih Kategori</option>
+                    <option v-for="kategori in kategoriList" :key="kategori" :value="kategori">{{ kategori }}</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>UT-Daerah *</label>
+                <select v-model="formData.upbjj" class="form-control" required>
+                    <option value="">Pilih UT-Daerah</option>
+                    <option v-for="upbjj in upbjjList" :key="upbjj" :value="upbjj">{{ upbjj }}</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Lokasi Rak</label>
+                <input 
+                    type="text" 
+                    v-model="formData.lokasiRak" 
+                    class="form-control"
+                >
+            </div>
+            <div class="form-group">
+                <label>Harga *</label>
+                <input 
+                    type="number" 
+                    v-model="formData.harga" 
+                    class="form-control" 
+                    required
+                    min="0"
+                >
+            </div>
+            <div class="form-group">
+                <label>Jumlah Stok *</label>
+                <input 
+                    type="number" 
+                    v-model="formData.qty" 
+                    class="form-control" 
+                    required
+                    min="0"
+                >
+            </div>
+            <div class="form-group">
+                <label>Safety Stock *</label>
+                <input 
+                    type="number" 
+                    v-model="formData.safety" 
+                    class="form-control" 
+                    required
+                    min="0"
+                >
+            </div>
+            <div class="form-group">
+                <label>Catatan</label>
+                <textarea 
+                    v-model="formData.catatanHTML" 
+                    class="form-control"
+                    rows="3"
+                ></textarea>
+            </div>
+        </form>
+        <template #footer>
+            <button @click="showForm = false" class="btn btn-secondary">Batal</button>
+            <button @click="saveItem" class="btn btn-primary">Simpan</button>
+        </template>
+    </app-modal>
+
+    <!-- Modal Konfirmasi Hapus -->
+    <app-modal 
+        :show="showDeleteModal" 
+        title="Konfirmasi Hapus"
+        @close="showDeleteModal = false"
+        @confirm="deleteItem"
+    >
+        <p>Apakah Anda yakin ingin menghapus bahan ajar <strong>{{ itemToDelete ? itemToDelete.judul : '' }}</strong>?</p>
+        <template #footer>
+            <button @click="showDeleteModal = false" class="btn btn-secondary">Batal</button>
+            <button @click="deleteItem" class="btn btn-danger">Hapus</button>
+        </template>
+    </app-modal>
+</div>
